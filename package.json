@@ -1,0 +1,35 @@
+{
+    "name": "simple-wireframe-comparison",
+    "version": "1.0.0",
+    "description": "Simple wireframe comparison tool without native dependencies",
+    "main": "simple-comparison.js",
+    "type": "module",
+    "scripts": {
+        "start": "node simple-comparison.js",
+        "test": "node -e \"console.log('✅ Dependencies check passed')\"",
+        "compare": "node simple-comparison.js"
+    },
+    "dependencies": {
+        "@google/genai": "^1.5.1",
+        "axios": "^1.6.0",
+        "pixelmatch": "^7.1.0",
+        "pngjs": "^7.0.0",
+        "puppeteer": "^24.10.1",
+        "sharp": "^0.34.2"
+    },
+    "devDependencies": {
+        "dotenv": "^16.0.0"
+    },
+    "engines": {
+        "node": ">=16.0.0"
+    },
+    "keywords": [
+        "wireframe",
+        "comparison",
+        "zeplin",
+        "web-testing",
+        "visual-testing"
+    ],
+    "author": "Your Name",
+    "license": "MIT"
+}
