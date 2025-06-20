@@ -18,8 +18,8 @@ const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY });
 
 class SimpleWireframeComparison {
   constructor(config) {
-    this.zeplinToken = process.env.ZEPLIN_TOKEN;
-    this.projectId = config.projectId;
+    this.zeplinToken = config.zeplinToken || process.env.ZEPLIN_TOKEN;
+    this.projectId = config.projectId || process.env.ZEPLIN_PROJECT_ID;
     this.outputDir = config.outputDir || './comparison-results';
     this.browser = null;
     this.baseUrl = 'https://api.zeplin.dev/v1';
@@ -88,7 +88,7 @@ class SimpleWireframeComparison {
   
       const diffPixels = pixelmatch(
         img1.data, img2.data, diff.data, width, height,
-        { threshold: 0.1 }  // You can adjust threshold for sensitivity
+        { threshold: 0.1 } 
       );
   
       await fs.writeFile(outputPath, PNG.sync.write(diff));
@@ -131,8 +131,8 @@ class SimpleWireframeComparison {
       // Resize the image using sharp before saving
       const resizedImageBuffer = await sharp(imageResponse.data)
         .resize(viewport.width, viewport.height, {
-          fit: 'contain', // or 'cover' or 'fill' depending on your goal
-          background: { r: 255, g: 255, b: 255, alpha: 1 } // background for padding (if any)
+          fit: 'contain',
+          background: { r: 255, g: 255, b: 255, alpha: 1 }
         })
         .toBuffer();
   
@@ -320,4 +320,4 @@ async function runComparison() {
 }
 
 // Uncomment to run the example
-runComparison();
+// runComparison();
