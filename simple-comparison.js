@@ -365,4 +365,4 @@ async function runComparison() {
 }
 
 // Uncomment to run the example
-runComparison();
+// runComparison();
