@@ -11,7 +11,6 @@ app = Flask(__name__)
 
 class ImageComparisonService:
     def __init__(self):
-        # You can configure different AI vision services here
         self.ollama_url = "http://localhost:11434/api/generate"  # Ollama with LLaVA
         
     def encode_image_to_base64(self, image_file) -> str:
@@ -135,22 +134,18 @@ def compare_wireframe_webpage():
         wireframe_b64 = comparison_service.encode_image_to_base64(wireframe_file)
         webpage_b64 = comparison_service.encode_image_to_base64(webpage_file)
 
-        print("Reached1")
 
         # default to ollama
         analysis_result = comparison_service.analyze_with_ollama_llava(
             wireframe_b64, webpage_b64
         )
 
-        print("Reached2")
-        # print(analysis_result)
         
         if not analysis_result["success"]:
             return jsonify({
                 "error": analysis_result["error"]
             }), 500
         
-        print("Reached3")
         
         # # Parse the analysis response
         structured_analysis = comparison_service.parse_analysis_response(
@@ -167,48 +162,5 @@ def compare_wireframe_webpage():
             "error": f"Server error: {str(e)}"
         }), 500
 
-
-@app.route('/test-models', methods=['GET'])
-def test_models():
-    """Test which AI models are available"""
-    results = {}
-    
-    # Test Ollama
-    try:
-        response = requests.get("http://localhost:11434/api/tags", timeout=5)
-        if response.status_code == 200:
-            models = response.json().get("models", [])
-            llava_available = any("llava" in model.get("name", "").lower() for model in models)
-            results["ollama"] = {
-                "available": True,
-                "llava_model": llava_available,
-                "models": [model.get("name") for model in models]
-            }
-        else:
-            results["ollama"] = {"available": False, "error": "Service not responding"}
-    except:
-        results["ollama"] = {"available": False, "error": "Connection failed"}
-    
-    # Test OpenAI
-    api_key = os.getenv('OPENAI_API_KEY')
-    results["openai"] = {
-        "available": bool(api_key),
-        "api_key_configured": bool(api_key)
-    }
-    
-    return jsonify(results)
-
 if __name__ == '__main__':
-    # # Add environment variable info
-    # print("=== Wireframe-Webpage Comparison API ===")
-    # print("Available endpoints:")
-    # print("  POST /compare-wireframe-webpage - Main comparison endpoint")
-    # print("  GET  /health - Health check")
-    # print("  GET  /test-models - Test AI model availability")
-    # print("\nConfiguration:")
-    # print(f"  Ollama URL: {comparison_service.ollama_url}")
-    # # print(f"  OpenAI API Key: {'✓ Configured' if comparison_service.openai_api_key else '✗ Not configured'}")
-    # print("\nTo use OpenAI GPT-4V, set environment variable: OPENAI_API_KEY")
-    # print("To use Ollama LLaVA, ensure Ollama is running locally with LLaVA model installed")
-    
     app.run(debug=True, host='0.0.0.0', port=5000)
