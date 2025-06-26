@@ -12,6 +12,8 @@ import {
   createPartFromUri,
 } from "@google/genai";
 import * as nodefs from "node:fs";
+import { fromPath } from "pdf2pic";
+import FormData from 'form-data'
 
 const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY });
 
@@ -48,40 +50,87 @@ class SimpleWireframeComparison {
     console.log('Initialization complete');
   }
 
+  async convertPdfToPng(pdfPath, outputImagePath, viewport) {
+    try {
+      const outputBase = path.basename(outputImagePath, ".png");
+      const converter = fromPath(pdfPath, {
+        density: 150,
+        saveFilename: outputBase,
+        savePath: path.dirname(outputImagePath),
+        format: "png",
+        width: viewport.width,
+        height: viewport.height,
+      });
+  
+      const result = await converter(1); // page 1 of PDF
+      console.log(`Converted PDF to PNG: ${result.path}`);
+      
+      return {
+        filepath: result.path,
+        filename: path.basename(result.path),
+      };
+    } catch (error) {
+      console.error("Error converting PDF to PNG:", error.message);
+      throw error;
+    }
+  }
+  
+
   async compareImages(imgPath1, imgPath2, outputPath) {
     try {
-      const img1 = PNG.sync.read(await fs.readFile(imgPath1));
-      const img2 = PNG.sync.read(await fs.readFile(imgPath2));
+      const img1Buffer = await fs.readFile(imgPath1);
+      const img2Buffer = await fs.readFile(imgPath2);
+      const img1 = PNG.sync.read(img1Buffer);
+      const img2 = PNG.sync.read(img2Buffer);
       
-      // Upload the first image
-      const uploadedFile = await ai.files.upload({
-        file: imgPath1,
-        config: { mimeType: "image/jpeg" },
-      });
+      // Convert image buffers to base64 strings
+    const img1Base64 = img1Buffer.toString('base64');
+    const img2Base64 = img2Buffer.toString('base64');
 
-      // Prepare the second image as inline data
-      const base64Image2File = nodefs.readFileSync(imgPath2, {
-        encoding: "base64",
-      });
+    // Step 1: Send base64 image data to Flask server
+    const form = new FormData();
+    form.append('wireframe', img1Buffer, { filename: 'wireframe.png', contentType: 'image/png' });
+    form.append('webpage', img2Buffer, { filename: 'webpage.png', contentType: 'image/png' });
+
+    // Send to Flask
+    const response = await axios.post('http://localhost:5000/compare-wireframe-webpage', form, {
+      headers: form.getHeaders(),
+      // timeout: 20000,
+    });
+
+    console.log("Flask analysis result:");
+    console.log(response.data.comparison_results);
+
+
+      // // Upload the first image
+      // const uploadedFile = await ai.files.upload({
+      //   file: imgPath1,
+      //   config: { mimeType: "image/jpeg" },
+      // });
+
+      // // Prepare the second image as inline data
+      // const base64Image2File = nodefs.readFileSync(imgPath2, {
+      //   encoding: "base64",
+      // });
 
       // Create the prompt with text and multiple images
 
-      const response = await ai.models.generateContent({
+      // const response = await ai.models.generateContent({
 
-        model: "gemini-2.5-flash",
-        contents: createUserContent([
-          "One of the images is a wireframe and the other is the actual webpage. You need to tell me whether the webpage design matches the wireframe or not. If not, what all does it miss",
-          createPartFromUri(uploadedFile.uri, uploadedFile.mimeType),
-          {
-            inlineData: {
-              mimeType: "image/png",
-              data: base64Image2File,
-            },
-          },
-        ]),
-      });
-      console.log("AI analysis:");
-      console.log(response.text);
+      //   model: "gemini-2.5-flash",
+      //   contents: createUserContent([
+      //     "One of the images is a wireframe and the other is the actual webpage. You need to tell me whether the webpage design matches the wireframe or not. If not, what all does it miss",
+      //     createPartFromUri(uploadedFile.uri, uploadedFile.mimeType),
+      //     {
+      //       inlineData: {
+      //         mimeType: "image/png",
+      //         data: base64Image2File,
+      //       },
+      //     },
+      //   ]),
+      // });
+      // console.log("AI analysis:");
+      // console.log(response.text);
 
       const { width, height } = img1;
       const diff = new PNG({ width, height });
@@ -194,21 +243,15 @@ class SimpleWireframeComparison {
     }
   }
 
-  async compareScreenToUrl(screenName, webUrl, viewport) {
+  async compareScreenToUrl(screenName, webUrl, viewport, pdfPath) {
     try {
       console.log(`Comparing "${screenName}" with ${webUrl}`);
       
-      const screens = await this.getZeplinScreens();
-      const screen = screens.find(s => s.name === screenName);
-      
-      if (!screen) throw new Error(`Screen "${screenName}" not found in Zeplin project`);
-  
       const [wireframeResult, webpageResult] = await Promise.all([
-        this.downloadWireframe(screen, viewport),
+        this.convertPdfToPng(pdfPath, path.join(this.outputDir, 'wireframes', `${screenName}_wireframe.png`), viewport),
         this.captureWebPage(webUrl, screenName, viewport)
       ]);
   
-      // Perform image comparison
       const diffFilename = `${screenName.replace(/[^a-z0-9]/gi, '_')}_diff.png`;
       const diffPath = path.join(this.outputDir, 'screenshots', diffFilename);
   
@@ -219,8 +262,7 @@ class SimpleWireframeComparison {
         wireframe: wireframeResult,
         webpage: webpageResult,
         diff: diffResult,
-        status: diffResult.diffPixels >= 0 ? 'completed' : 'failed',
-        zeplinUrl: `https://app.zeplin.io/project/${this.projectId}/screen/${screen.id}`
+        status: diffResult.diffPixels >= 0 ? 'completed' : 'failed'
       };
     } catch (error) {
       console.error(`Error comparing ${screenName} to ${webUrl}:`, error.message);
@@ -245,7 +287,8 @@ class SimpleWireframeComparison {
         const result = await this.compareScreenToUrl(
           comparison.screenName,
           comparison.webUrl,
-          comparison.viewport
+          comparison.viewport,
+          comparison.pdfPath
         );
         results.push(result);
       } catch (error) {
@@ -291,9 +334,11 @@ async function runComparison() {
       {
         screenName: 'Desktop - 1',
         webUrl: 'http://localhost:5173/',
-        viewport: { width: 1920, height: 1080 }
+        viewport: { width: 1920, height: 1080 },
+        pdfPath: './zeplin-wireframes/Desktop-1.pdf'
       },
     ];
+    
     
     console.log('Starting comparison process...');
     const results = await tool.runBatchComparison(comparisons);
@@ -320,4 +365,4 @@ async function runComparison() {
 }
 
 // Uncomment to run the example
-// runComparison();
+runComparison();

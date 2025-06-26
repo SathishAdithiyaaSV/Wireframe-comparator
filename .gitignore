@@ -2,3 +2,5 @@ node_modules
 package-lock.json
 .env
 comparison-results
+venv
+_pycache_
