@@ -50,7 +50,7 @@ class SimpleWireframeComparison {
     console.log('Initialization complete');
   }
 
-  async convertPdfToPng(pdfPath, outputImagePath, viewport) {
+  async convertPdfToPng(pdfPath, outputImagePath, viewport, pageNumber) {
     try {
       const outputBase = path.basename(outputImagePath, ".png");
       const converter = fromPath(pdfPath, {
@@ -62,7 +62,7 @@ class SimpleWireframeComparison {
         height: viewport.height,
       });
   
-      const result = await converter(1); // page 1 of PDF
+      const result = await converter(pageNumber);
       console.log(`Converted PDF to PNG: ${result.path}`);
       
       return {
@@ -243,12 +243,12 @@ class SimpleWireframeComparison {
     }
   }
 
-  async compareScreenToUrl(screenName, webUrl, viewport, pdfPath) {
+  async compareScreenToUrl(screenName, webUrl, viewport, pdfPath, pageNumber) {
     try {
       console.log(`Comparing "${screenName}" with ${webUrl}`);
       
       const [wireframeResult, webpageResult] = await Promise.all([
-        this.convertPdfToPng(pdfPath, path.join(this.outputDir, 'wireframes', `${screenName}_wireframe.png`), viewport),
+        this.convertPdfToPng(pdfPath, path.join(this.outputDir, 'wireframes', `${screenName}_wireframe.png`), viewport, pageNumber),
         this.captureWebPage(webUrl, screenName, viewport)
       ]);
   
@@ -288,7 +288,8 @@ class SimpleWireframeComparison {
           comparison.screenName,
           comparison.webUrl,
           comparison.viewport,
-          comparison.pdfPath
+          comparison.pdfPath,
+          comparison.pageNumber
         );
         results.push(result);
       } catch (error) {
@@ -335,7 +336,8 @@ async function runComparison() {
         screenName: 'Desktop - 1',
         webUrl: 'http://localhost:5173/',
         viewport: { width: 1920, height: 1080 },
-        pdfPath: './zeplin-wireframes/Desktop-1.pdf'
+        pdfPath: './zeplin-wireframes/Desktop-1.pdf',
+        pageNumber: 1
       },
     ];
     
@@ -365,4 +367,4 @@ async function runComparison() {
 }
 
 // Uncomment to run the example
-// runComparison();
+runComparison();
